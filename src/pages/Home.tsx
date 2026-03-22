@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 
 interface Experiment {
@@ -14,35 +15,35 @@ const experiments: Experiment[] = [
 ];
 
 export default function Home() {
-  return (
-    <div
-      style={{
-        maxWidth: 600,
-        margin: "0 auto",
-        padding: "10vh 1rem",
-        fontFamily: "system-ui",
-      }}
-    >
-      <h1 style={{ fontSize: "1.5rem", marginBottom: "0.25rem" }}>
-        Web Playground
-      </h1>
-      <p style={{ color: "#666", marginBottom: "2rem" }}>
-        A place to test random web things across devices.
-      </p>
+  useEffect(() => {
+    document.title = "Web Playground";
+  }, []);
 
-      {experiments.length === 0 ? (
-        <p style={{ color: "#999" }}>No experiments yet.</p>
-      ) : (
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {experiments.map((e) => (
-            <li key={e.path} style={{ marginBottom: "0.5rem" }}>
-              <Link to={e.path} style={{ color: "#0969da" }}>
-                {e.title}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+  return (
+    <div className="min-h-screen bg-[#000000] text-white">
+      <div className="max-w-xl mx-auto px-4 pt-[10vh] pb-16">
+        <h1 className="text-2xl font-bold mb-1">Web Playground</h1>
+        <p className="text-zinc-500 mb-8">
+          A place to test random web things across devices.
+        </p>
+
+        {experiments.length === 0 ? (
+          <p className="text-zinc-600">No experiments yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {experiments.map((e) => (
+              <li key={e.path}>
+                <Link
+                  to={e.path}
+                  className="text-zinc-400 hover:text-white transition-colors underline underline-offset-2"
+                >
+                  {e.title}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

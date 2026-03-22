@@ -1,28 +1,69 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { Separator } from "@/components/ui/separator";
+import {
+  Volume2,
+  Minus,
+  Wrench,
+  Gamepad2,
+  Clock,
+  Leaf,
+  Sparkles,
+  Joystick,
+  Factory,
+  Music,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   audioEngine,
   SOUND_PROFILES,
   type OscillatorShape,
   type SoundProfile,
-} from "../lib/audio-engine";
+} from "@/lib/audio-engine";
 
-const OSCILLATOR_TYPES: OscillatorShape[] = ["sine", "square", "sawtooth", "triangle"];
+const PROFILE_ICONS: Record<SoundProfile, LucideIcon> = {
+  minimalist: Minus,
+  mechanical: Wrench,
+  retro: Clock,
+  organic: Leaf,
+  cosmic: Sparkles,
+  arcade: Joystick,
+  vintage: Gamepad2,
+  industrial: Factory,
+};
+
+const OSCILLATOR_TYPES: OscillatorShape[] = [
+  "sine",
+  "square",
+  "sawtooth",
+  "triangle",
+];
 
 const PRESETS = [
   { label: "Bass Hit", f: 80, t: "sine" as const, d: 0.3, v: 0.2, r: 0.1 },
-  { label: "Laser", f: 3000, t: "sawtooth" as const, d: 0.15, v: 0.08, r: 0.05 },
+  {
+    label: "Laser",
+    f: 3000,
+    t: "sawtooth" as const,
+    d: 0.15,
+    v: 0.08,
+    r: 0.05,
+  },
   { label: "Coin", f: 1400, t: "square" as const, d: 0.08, v: 0.06, r: 1.5 },
   { label: "Blip", f: 800, t: "sine" as const, d: 0.03, v: 0.1, r: 0.8 },
   { label: "Alarm", f: 1000, t: "square" as const, d: 0.5, v: 0.05, r: 2 },
   { label: "Deep Hum", f: 55, t: "triangle" as const, d: 1, v: 0.15, r: 0.9 },
   { label: "Chirp", f: 2000, t: "sine" as const, d: 0.05, v: 0.08, r: 0.1 },
   { label: "Buzz", f: 150, t: "sawtooth" as const, d: 0.2, v: 0.04, r: 1 },
-];
+] as const;
 
 export default function AudioPlayground() {
   const [unlocked, setUnlocked] = useState(false);
-  const [profile, setProfile] = useState<SoundProfile>("mechanical");
+  const [profile, setProfile] = useState<SoundProfile>("minimalist");
   const [muted, setMuted] = useState(false);
 
   const [freq, setFreq] = useState(440);
@@ -30,6 +71,10 @@ export default function AudioPlayground() {
   const [duration, setDuration] = useState(0.15);
   const [volume, setVolume] = useState(0.12);
   const [ramp, setRamp] = useState(0.5);
+
+  useEffect(() => {
+    document.title = "Audio Playground — Web Playground";
+  }, []);
 
   const handleUnlock = useCallback(async () => {
     const ok = await audioEngine.unlock();
@@ -44,6 +89,36 @@ export default function AudioPlayground() {
   useEffect(() => {
     audioEngine.isMuted = muted;
   }, [muted]);
+
+  useEffect(() => {
+    const onScroll = () => audioEngine.handleScroll(window.scrollY);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const inSilentZone = (el: HTMLElement) => !!el.closest("[data-no-sound]");
+    const onHover = (e: Event) => {
+      const el = e.target as HTMLElement;
+      if (inSilentZone(el)) return;
+      if (el.matches("button, a, [role='button'], .cursor-pointer")) {
+        audioEngine.playHover();
+      }
+    };
+    const onClick = (e: Event) => {
+      const el = e.target as HTMLElement;
+      if (inSilentZone(el)) return;
+      if (el.closest("button, a, [role='button'], .cursor-pointer")) {
+        audioEngine.playClick();
+      }
+    };
+    document.addEventListener("mouseenter", onHover, true);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("mouseenter", onHover, true);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, []);
 
   const playFree = useCallback(() => {
     audioEngine.playTone({
@@ -70,183 +145,391 @@ export default function AudioPlayground() {
     });
   };
 
-  if (!unlocked) {
-    return (
-      <div className="max-w-sm mx-auto px-4 pt-[20vh] text-center font-sans">
-        <h1 className="text-xl font-bold mb-1">Audio Playground</h1>
-        <p className="text-zinc-500 text-sm mb-6">
-          Browsers require a user gesture to enable audio.
-        </p>
-        <button
-          onClick={handleUnlock}
-          className="bg-zinc-900 text-white px-8 py-3 rounded-lg text-sm font-semibold hover:bg-zinc-800 active:scale-95 transition-all cursor-pointer"
-        >
-          Enable Audio
-        </button>
-        <div className="mt-8">
-          <Link to="/" className="text-zinc-400 text-xs hover:text-zinc-600 transition-colors">
-            &larr; Back to home
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const [playing, setPlaying] = useState(false);
+  const [activeNote, setActiveNote] = useState<{
+    freq: number;
+    dur: number;
+    index: number;
+    wave: OscillatorShape;
+  } | null>(null);
+  const [noteHistory, setNoteHistory] = useState<
+    { freq: number; dur: number; time: number; wave: OscillatorShape }[]
+  >([]);
+
+  const PROFILE_WAVEFORM: Record<SoundProfile, OscillatorShape> = {
+    minimalist: "sine",
+    mechanical: "square",
+    retro: "triangle",
+    organic: "sine",
+    cosmic: "sine",
+    arcade: "square",
+    vintage: "sine",
+    industrial: "sawtooth",
+  };
+
+  const MELODY: [number, number][] = [
+    [262, 0.3],
+    [262, 0.15],
+    [294, 0.4],
+    [262, 0.4],
+    [349, 0.4],
+    [330, 0.6],
+    [262, 0.3],
+    [262, 0.15],
+    [294, 0.4],
+    [262, 0.4],
+    [392, 0.4],
+    [349, 0.6],
+    [262, 0.3],
+    [262, 0.15],
+    [523, 0.4],
+    [440, 0.4],
+    [349, 0.4],
+    [330, 0.4],
+    [294, 0.6],
+    [466, 0.3],
+    [466, 0.15],
+    [440, 0.4],
+    [349, 0.4],
+    [392, 0.4],
+    [349, 0.6],
+  ];
+
+  const playTune = useCallback(() => {
+    if (playing) return;
+    setPlaying(true);
+    setNoteHistory([]);
+
+    const wave = PROFILE_WAVEFORM[profile];
+    let time = 0;
+    const startTime = Date.now();
+
+    MELODY.forEach(([f, dur], i) => {
+      setTimeout(() => {
+        audioEngine.playTone({
+          frequency: f,
+          type: wave,
+          duration: dur * 0.9,
+          volume: 0.15,
+          rampMultiplier: 0.85,
+        });
+        setActiveNote({ freq: f, dur, index: i, wave });
+        setNoteHistory((prev) => [
+          ...prev,
+          { freq: f, dur, time: Date.now() - startTime, wave },
+        ]);
+      }, time * 1000);
+      time += dur + 0.05;
+    });
+
+    setTimeout(() => {
+      setPlaying(false);
+      setActiveNote(null);
+    }, time * 1000);
+  }, [playing, profile]);
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-8 pb-16 font-sans">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <Link to="/" className="text-zinc-400 text-[0.7rem] hover:text-zinc-600 transition-colors no-underline">
+    <div className="dark min-h-screen w-full bg-[#000000] relative text-white">
+      {/* Grid pattern */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none"
+        style={{
+          backgroundImage: `
+            repeating-linear-gradient(45deg, rgba(0, 255, 65, 0.08) 0, rgba(0, 255, 65, 0.08) 1px, transparent 1px, transparent 12px),
+            repeating-linear-gradient(-45deg, rgba(0, 255, 65, 0.08) 0, rgba(0, 255, 65, 0.08) 1px, transparent 1px, transparent 12px),
+            repeating-linear-gradient(90deg, rgba(0, 255, 65, 0.03) 0, rgba(0, 255, 65, 0.03) 1px, transparent 1px, transparent 4px)
+          `,
+          backgroundSize: "24px 24px, 24px 24px, 8px 8px",
+        }}
+      />
+
+      {/* Hero */}
+      <section className="relative z-10 lg:grid lg:grid-cols-2 lg:min-h-screen">
+        {/* Left: text */}
+        <div className="flex flex-col justify-center px-6 py-12 lg:px-16 lg:py-0">
+          <Link
+            to="/"
+            className="text-zinc-500 text-xs hover:text-white transition-colors mb-6 w-fit"
+          >
             &larr; Home
           </Link>
-          <h1 className="text-xl font-bold mt-1">Audio Playground</h1>
-        </div>
-        <button
-          onClick={() => setMuted((m) => !m)}
-          className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
-            muted
-              ? "bg-red-50 text-red-600 border-red-200"
-              : "bg-green-50 text-green-600 border-green-200"
-          }`}
-        >
-          {muted ? "Muted" : "Sound On"}
-        </button>
-      </div>
 
-      <Section>
-        <p className="text-sm text-zinc-600 leading-relaxed">
-          <strong className="text-zinc-900">No audio files. Zero downloads.</strong>{" "}
-          Every sound on this page is generated in real-time using the{" "}
-          <strong>Web Audio API</strong> — the browser creates raw oscillator
-          waveforms (sine, square, sawtooth, triangle), shapes them with gain
-          nodes, and applies frequency ramps, all in under a millisecond.
-        </p>
-        <p className="text-sm text-zinc-600 leading-relaxed mt-3">
-          Unlike sample-based audio, procedural sounds are{" "}
-          <strong>infinitely tunable</strong> — change the waveform, pitch,
-          decay, and envelope on the fly. A single function replaces hundreds of
-          .mp3 files. Each "sound profile" below is just a different set of
-          parameters fed to the same oscillator — personality in UI sound is a
-          matter of math, not media.
-        </p>
-      </Section>
+          <h1 className="text-3xl lg:text-5xl font-bold tracking-tight leading-tight mb-4">
+            Audio Playground
+          </h1>
 
-      <Section>
-        <SectionLabel>Sound Profile</SectionLabel>
-        <div className="flex flex-wrap gap-1.5">
-          {SOUND_PROFILES.map((p) => (
-            <Chip
-              key={p}
-              active={profile === p}
-              onClick={() => {
-                setProfile(p);
-                audioEngine.playClick();
-              }}
+          <p className="text-zinc-400 leading-relaxed mb-4 max-w-md">
+            <strong className="text-white">
+              No audio files. Zero downloads.
+            </strong>{" "}
+            Every sound is generated in real-time using the{" "}
+            <a
+              href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold underline underline-offset-2 text-white hover:text-zinc-400 transition-colors"
             >
-              {p}
-            </Chip>
-          ))}
-        </div>
-      </Section>
+              Web Audio API
+            </a>
+            . The browser creates raw oscillator waveforms, shapes them with
+            gain nodes, and applies frequency ramps — all in under a
+            millisecond.
+          </p>
 
-      <Section>
-        <SectionLabel>Profile Sounds</SectionLabel>
-        <div className="grid grid-cols-2 gap-2">
-          <SoundBox label="Hover Me" sub="hover" onMouseEnter={() => audioEngine.playHover()} />
-          <SoundBox label="Click Me" sub="click" onClick={() => audioEngine.playClick()} />
-          <SoundBox label="Dismiss" sub="click" onClick={() => audioEngine.playDismiss()} />
-          <SoundBox label="Scroll Tick" sub="click" onClick={() => audioEngine.playScroll()} />
-        </div>
-      </Section>
+          <p className="text-zinc-400 leading-relaxed mb-8 max-w-md">
+            A single function replaces hundreds of .mp3 files. Each sound
+            profile is just a different parameter set fed to the same oscillator
+            — personality in UI sound is math, not media.
+          </p>
 
-      <Section>
-        <SectionLabel>Free Play</SectionLabel>
-        <div className="mb-3">
-          <SectionLabel sub>Waveform</SectionLabel>
-          <div className="flex gap-1.5">
-            {OSCILLATOR_TYPES.map((t) => (
-              <Chip key={t} active={oscType === t} onClick={() => setOscType(t)}>
-                {t}
-              </Chip>
-            ))}
+          <div className="flex items-center gap-3">
+            {!unlocked ? (
+              <Button
+                variant="destructive"
+                onClick={handleUnlock}
+                className="animate-pulse gap-1.5"
+              >
+                <Volume2 className="size-4" />
+                Enable Audio
+              </Button>
+            ) : (
+              <Badge
+                variant={muted ? "destructive" : "secondary"}
+                className="cursor-pointer select-none"
+                onClick={() => setMuted((m) => !m)}
+              >
+                {muted ? "Muted" : "Sound On"}
+              </Badge>
+            )}
+          </div>
+
+          {unlocked && (
+            <div className="mt-6">
+              <ContextInfo />
+            </div>
+          )}
+        </div>
+
+        {/* Right: profile sounds */}
+        <div className="flex flex-col justify-center px-6 py-8 lg:px-12 lg:py-0">
+          <div className="max-w-md mx-auto w-full space-y-6">
+            <div>
+              <SliderLabel>Sound Profile</SliderLabel>
+              <div className="flex flex-wrap gap-2">
+                {SOUND_PROFILES.map((p) => {
+                  const Icon = PROFILE_ICONS[p];
+                  return (
+                    <Button
+                      key={p}
+                      size="default"
+                      variant={profile === p ? "default" : "outline"}
+                      className="gap-1.5 capitalize"
+                      onClick={() => {
+                        setProfile(p);
+                        audioEngine.playClick();
+                      }}
+                    >
+                      <Icon className="size-3.5" />
+                      {p}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Separator className="bg-zinc-800" />
+
+            <div>
+              <SliderLabel>Try It</SliderLabel>
+              <div className="grid grid-cols-2 gap-2">
+                <SoundBox
+                  label="Hover Me"
+                  sub="hover"
+                  onMouseEnter={() => audioEngine.playHover()}
+                />
+                <SoundBox
+                  label="Click Me"
+                  sub="click"
+                  onClick={() => audioEngine.playClick()}
+                />
+                <SoundBox
+                  label="Dismiss"
+                  sub="click"
+                  onClick={() => audioEngine.playDismiss()}
+                />
+                <SoundBox
+                  label="Scroll Tick"
+                  sub="click"
+                  onClick={() => audioEngine.playScroll()}
+                />
+              </div>
+            </div>
+
+            <Separator className="bg-zinc-800" />
+
+            <div>
+              <SliderLabel>Demo Melody</SliderLabel>
+              <Button
+                variant={playing ? "secondary" : "outline"}
+                className="w-full gap-2"
+                disabled={playing}
+                onClick={playTune}
+              >
+                <Music className="size-4" />
+                {playing ? "Playing..." : "Play Birthday Tune"}
+              </Button>
+              <p className="text-[0.6rem] text-zinc-600 mt-2">
+                Switch profiles above to hear the same tune in different styles
+              </p>
+              <MelodyVisualizer
+                melody={MELODY}
+                activeNote={activeNote}
+                noteHistory={noteHistory}
+                playing={playing}
+                wave={PROFILE_WAVEFORM[profile]}
+              />
+            </div>
           </div>
         </div>
-        <SliderControl label="Frequency" value={freq} display={`${freq} Hz`} min={20} max={8000} step={1} onChange={setFreq} hint="20 Hz — 8000 Hz" />
-        <SliderControl label="Duration" value={duration} display={`${duration.toFixed(2)}s`} min={0.01} max={2} step={0.01} onChange={setDuration} />
-        <SliderControl label="Volume" value={volume} display={`${(volume * 100).toFixed(0)}%`} min={0} max={0.5} step={0.01} onChange={setVolume} />
-        <SliderControl label="Freq Ramp" value={ramp} display={`${ramp.toFixed(2)}x`} min={0.05} max={2} step={0.01} onChange={setRamp} hint="<1 = pitch drops, >1 = pitch rises" />
-        <button
-          onClick={playFree}
-          className="w-full bg-zinc-900 text-white py-3 rounded-lg text-sm font-semibold hover:bg-zinc-800 active:scale-95 transition-all mt-1 cursor-pointer"
-        >
-          Play Tone
-        </button>
-      </Section>
+      </section>
 
-      <Section>
-        <SectionLabel>Quick Presets</SectionLabel>
-        <div className="flex flex-wrap gap-1.5">
-          {PRESETS.map((p) => (
-            <Chip key={p.label} active={false} onClick={() => applyPreset(p)}>
-              {p.label}
-            </Chip>
-          ))}
-        </div>
-      </Section>
+      {/* Controls */}
+      <section
+        data-no-sound
+        className="relative z-10 max-w-3xl mx-auto px-6 py-12"
+      >
+        <Card className="bg-zinc-950/80 border-zinc-800 text-white">
+          <CardHeader>
+            <CardTitle>Free Play</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div>
+              <SliderLabel>Waveform</SliderLabel>
+              <div className="flex gap-1.5">
+                {OSCILLATOR_TYPES.map((t) => (
+                  <Button
+                    key={t}
+                    size="sm"
+                    variant={oscType === t ? "default" : "outline"}
+                    onClick={() => setOscType(t)}
+                  >
+                    {t}
+                  </Button>
+                ))}
+              </div>
+            </div>
 
-      <Section>
-        <SectionLabel>Scroll Sound</SectionLabel>
-        <ScrollBox />
-      </Section>
+            <Separator className="bg-zinc-800" />
 
-      <Section>
-        <SectionLabel>AudioContext Info</SectionLabel>
-        <ContextInfo />
-      </Section>
+            <SliderRow
+              label="Frequency"
+              value={freq}
+              display={`${freq} Hz`}
+              min={20}
+              max={8000}
+              step={1}
+              onChange={setFreq}
+              hint="20 Hz — 8000 Hz"
+            />
+            <SliderRow
+              label="Duration"
+              value={duration}
+              display={`${duration.toFixed(2)}s`}
+              min={0.01}
+              max={2}
+              step={0.01}
+              onChange={setDuration}
+            />
+            <SliderRow
+              label="Volume"
+              value={volume}
+              display={`${(volume * 100).toFixed(0)}%`}
+              min={0}
+              max={0.5}
+              step={0.01}
+              onChange={setVolume}
+            />
+            <SliderRow
+              label="Freq Ramp"
+              value={ramp}
+              display={`${ramp.toFixed(2)}x`}
+              min={0.05}
+              max={2}
+              step={0.01}
+              onChange={setRamp}
+              hint="<1 pitch drops · >1 pitch rises"
+            />
+
+            <Button className="w-full" size="lg" onClick={playFree}>
+              Play Tone
+            </Button>
+
+            <Separator className="bg-zinc-800" />
+
+            <div>
+              <SliderLabel>Quick Presets</SliderLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {PRESETS.map((p) => (
+                  <Button
+                    key={p.label}
+                    size="sm"
+                    variant="outline"
+                    onClick={() => applyPreset(p)}
+                  >
+                    {p.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
 
-function Section({ children }: { children: React.ReactNode }) {
+function SliderLabel({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-5 mb-3">
-      {children}
-    </div>
-  );
-}
-
-function SectionLabel({ children, sub }: { children: React.ReactNode; sub?: boolean }) {
-  return (
-    <span
-      className={`block uppercase tracking-widest font-semibold text-zinc-400 mb-2 ${
-        sub ? "text-[0.6rem]" : "text-[0.7rem]"
-      }`}
-    >
+    <span className="block text-[0.65rem] uppercase tracking-widest font-semibold text-zinc-500 mb-2">
       {children}
     </span>
   );
 }
 
-function Chip({
-  children,
-  active,
-  onClick,
-}: {
-  children: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-}) {
+function SliderRow({
+  label,
+  display,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  hint,
+}: Readonly<{
+  label: string;
+  display: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (v: number) => void;
+  hint?: string;
+}>) {
   return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all active:scale-95 cursor-pointer ${
-        active
-          ? "bg-zinc-900 text-white border-zinc-900"
-          : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-400"
-      }`}
-    >
-      {children}
-    </button>
+    <div>
+      <div className="flex justify-between items-center mb-2">
+        <SliderLabel>{label}</SliderLabel>
+        <span className="text-xs font-bold text-white">{display}</span>
+      </div>
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={(v) => onChange(Array.isArray(v) ? v[0] : v)}
+      />
+      {hint && <p className="text-[0.6rem] text-zinc-600 mt-1.5">{hint}</p>}
+    </div>
   );
 }
 
@@ -255,113 +538,268 @@ function SoundBox({
   sub,
   onMouseEnter,
   onClick,
-}: {
+}: Readonly<{
   label: string;
   sub: string;
   onMouseEnter?: () => void;
   onClick?: () => void;
-}) {
+}>) {
   return (
-    <div
+    <button
+      type="button"
       onMouseEnter={onMouseEnter}
       onClick={onClick}
-      className="border border-zinc-200 rounded-lg p-5 text-center cursor-pointer bg-white hover:border-zinc-400 transition-all select-none active:scale-95"
+      className="rounded-lg border border-zinc-800 p-5 text-center cursor-pointer bg-zinc-950/60 hover:bg-zinc-800/60 hover:border-zinc-700 transition-all select-none active:scale-95"
     >
-      <div className="text-sm font-semibold text-zinc-900">{label}</div>
-      <div className="text-[0.65rem] text-zinc-400 mt-1">{sub}</div>
-    </div>
-  );
-}
-
-function SliderControl({
-  label,
-  value,
-  display,
-  min,
-  max,
-  step,
-  onChange,
-  hint,
-}: {
-  label: string;
-  value: number;
-  display: string;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-  hint?: string;
-}) {
-  return (
-    <div className="mb-3">
-      <div className="flex justify-between items-center">
-        <span className="text-[0.6rem] uppercase tracking-widest font-semibold text-zinc-400">
-          {label}
-        </span>
-        <span className="text-xs font-bold text-zinc-900">{display}</span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-zinc-900"
-      />
-      {hint && <div className="text-[0.6rem] text-zinc-400 mt-0.5">{hint}</div>}
-    </div>
-  );
-}
-
-function ScrollBox() {
-  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    audioEngine.handleScroll(e.currentTarget.scrollTop);
-  }, []);
-
-  return (
-    <div
-      onScroll={handleScroll}
-      className="h-30 overflow-y-scroll border border-zinc-200 rounded-lg bg-white"
-    >
-      <div className="h-[800px] p-4">
-        <p className="text-xs text-zinc-500 mb-2">
-          Scroll here to hear tick sounds (~60px intervals).
-        </p>
-        {Array.from({ length: 20 }).map((_, i) => (
-          <div
-            key={`scroll-row-${i}`}
-            className="py-2 border-b border-zinc-100 text-xs text-zinc-400"
-          >
-            Row {i + 1}
-          </div>
-        ))}
-      </div>
-    </div>
+      <div className="text-sm font-semibold text-white">{label}</div>
+      <div className="text-[0.65rem] text-zinc-500 mt-1">{sub}</div>
+    </button>
   );
 }
 
 function ContextInfo() {
   const ctx = audioEngine.getContext();
-  if (!ctx) return <p className="text-xs text-zinc-400">No context</p>;
+  if (!ctx) return <p className="text-xs text-zinc-500">No context</p>;
+
+  const items = [
+    ["State", ctx.state],
+    ["Sample Rate", `${ctx.sampleRate} Hz`],
+    ["Base Latency", `${(ctx.baseLatency * 1000).toFixed(1)} ms`],
+    ["Current Time", `${ctx.currentTime.toFixed(2)}s`],
+    ["Destination Channels", ctx.destination.maxChannelCount],
+  ] as const;
 
   return (
-    <div className="text-xs text-zinc-600 leading-7">
-      <div>
-        <strong>State:</strong> {ctx.state}
-      </div>
-      <div>
-        <strong>Sample Rate:</strong> {ctx.sampleRate} Hz
-      </div>
-      <div>
-        <strong>Base Latency:</strong> {(ctx.baseLatency * 1000).toFixed(1)} ms
-      </div>
-      <div>
-        <strong>Current Time:</strong> {ctx.currentTime.toFixed(2)}s
-      </div>
-      <div>
-        <strong>Destination Channels:</strong> {ctx.destination.maxChannelCount}
-      </div>
+    <div className="text-xs text-zinc-500 leading-7">
+      {items.map(([key, val]) => (
+        <div key={key}>
+          <strong className="text-zinc-300">{key}:</strong> {val}
+        </div>
+      ))}
     </div>
+  );
+}
+
+function MelodyVisualizer({
+  melody,
+  activeNote,
+  noteHistory,
+  playing,
+  wave,
+}: Readonly<{
+  melody: [number, number][];
+  activeNote: {
+    freq: number;
+    dur: number;
+    index: number;
+    wave: OscillatorShape;
+  } | null;
+  noteHistory: {
+    freq: number;
+    dur: number;
+    time: number;
+    wave: OscillatorShape;
+  }[];
+  playing: boolean;
+  wave: OscillatorShape;
+}>) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animRef = useRef<number>(0);
+
+  const minFreq = Math.min(...melody.map(([f]) => f));
+  const maxFreq = Math.max(...melody.map(([f]) => f));
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width;
+    const h = rect.height;
+
+    const freqToY = (freq: number) => {
+      const pad = 24;
+      return h - pad - ((freq - minFreq) / (freqRange || 1)) * (h - pad * 2);
+    };
+    const freqRange = maxFreq - minFreq;
+    const stepX = w / Math.max(melody.length - 1, 1);
+
+    const points = melody.map(([freq], i) => ({
+      x: i * stepX,
+      y: freqToY(freq),
+    }));
+
+    const draw = () => {
+      ctx.clearRect(0, 0, w, h);
+
+      // Grid
+      ctx.strokeStyle = "rgba(255,255,255,0.04)";
+      ctx.lineWidth = 1;
+      for (let i = 1; i < 5; i++) {
+        const y = (h / 5) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      // Freq labels
+      ctx.fillStyle = "rgba(255,255,255,0.15)";
+      ctx.font = "9px monospace";
+      ctx.textAlign = "left";
+      ctx.fillText(`${maxFreq}Hz`, 4, 12);
+      ctx.fillText(`${minFreq}Hz`, 4, h - 4);
+
+      // Gradient fill under the line
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, "rgba(0, 255, 65, 0.12)");
+      grad.addColorStop(1, "rgba(0, 255, 65, 0)");
+
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, h);
+      // Smooth curve through points
+      for (let i = 0; i < points.length; i++) {
+        if (i === 0) {
+          ctx.lineTo(points[i].x, points[i].y);
+        } else {
+          const prev = points[i - 1];
+          const cpx = (prev.x + points[i].x) / 2;
+          ctx.bezierCurveTo(
+            cpx,
+            prev.y,
+            cpx,
+            points[i].y,
+            points[i].x,
+            points[i].y,
+          );
+        }
+      }
+      ctx.lineTo(points[points.length - 1].x, h);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Unplayed line (dim)
+      ctx.beginPath();
+      for (let i = 0; i < points.length; i++) {
+        if (i === 0) {
+          ctx.moveTo(points[i].x, points[i].y);
+        } else {
+          const prev = points[i - 1];
+          const cpx = (prev.x + points[i].x) / 2;
+          ctx.bezierCurveTo(
+            cpx,
+            prev.y,
+            cpx,
+            points[i].y,
+            points[i].x,
+            points[i].y,
+          );
+        }
+      }
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Played line (green glow)
+      if (noteHistory.length > 0) {
+        const playedEnd = Math.min(noteHistory.length, points.length);
+        ctx.beginPath();
+        for (let i = 0; i < playedEnd; i++) {
+          if (i === 0) {
+            ctx.moveTo(points[i].x, points[i].y);
+          } else {
+            const prev = points[i - 1];
+            const cpx = (prev.x + points[i].x) / 2;
+            ctx.bezierCurveTo(
+              cpx,
+              prev.y,
+              cpx,
+              points[i].y,
+              points[i].x,
+              points[i].y,
+            );
+          }
+        }
+        ctx.shadowColor = "rgba(0, 255, 65, 0.5)";
+        ctx.shadowBlur = 8;
+        ctx.strokeStyle = "rgba(0, 255, 65, 0.8)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      // Dots on each note
+      points.forEach((pt, i) => {
+        const isActive = activeNote?.index === i;
+        const isPlayed = i < noteHistory.length;
+
+        if (isActive) {
+          // Outer glow
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(0, 255, 65, 0.15)";
+          ctx.fill();
+          // Inner dot
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(0, 255, 65, 1)";
+          ctx.shadowColor = "rgba(0, 255, 65, 0.8)";
+          ctx.shadowBlur = 16;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        } else if (isPlayed) {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(0, 255, 65, 0.5)";
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+          ctx.fill();
+        }
+      });
+
+      // Info text
+      if (activeNote) {
+        ctx.fillStyle = "rgba(0, 255, 65, 0.9)";
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(
+          `${activeNote.freq}Hz  ${activeNote.wave}  ${activeNote.dur.toFixed(2)}s`,
+          w - 4,
+          12,
+        );
+      } else if (!playing && noteHistory.length > 0) {
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "right";
+        ctx.fillText(`${wave}  ${noteHistory.length} notes played`, w - 4, 12);
+      } else if (!playing) {
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.font = "10px monospace";
+        ctx.textAlign = "center";
+        ctx.fillText("Play the tune to see the visualizer", w / 2, h / 2);
+      }
+
+      animRef.current = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => cancelAnimationFrame(animRef.current);
+  }, [melody, activeNote, noteHistory, playing, wave, minFreq, maxFreq]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="w-full h-32 mt-4 rounded-lg border border-zinc-800 bg-zinc-950/60"
+    />
   );
 }
