@@ -24,6 +24,12 @@ import {
   type OscillatorShape,
   type SoundProfile,
 } from "@/lib/audio-engine";
+import {
+  MELODIES,
+  MELODY_CATEGORIES,
+  type Melody,
+  type MelodyCategory,
+} from "@/lib/melodies";
 
 const PROFILE_ICONS: Record<SoundProfile, LucideIcon> = {
   minimalist: Minus,
@@ -146,6 +152,9 @@ export default function AudioPlayground() {
   };
 
   const [playing, setPlaying] = useState(false);
+  const [selectedMelody, setSelectedMelody] = useState<Melody>(MELODIES[0]);
+  const [melodyCategory, setMelodyCategory] =
+    useState<MelodyCategory>("Classic Melodies");
   const [activeNote, setActiveNote] = useState<{
     freq: number;
     dur: number;
@@ -155,6 +164,7 @@ export default function AudioPlayground() {
   const [noteHistory, setNoteHistory] = useState<
     { freq: number; dur: number; time: number; wave: OscillatorShape }[]
   >([]);
+  const timeoutsRef = useRef<number[]>([]);
 
   const PROFILE_WAVEFORM: Record<SoundProfile, OscillatorShape> = {
     minimalist: "sine",
@@ -167,66 +177,50 @@ export default function AudioPlayground() {
     industrial: "sawtooth",
   };
 
-  const MELODY: [number, number][] = [
-    [262, 0.3],
-    [262, 0.15],
-    [294, 0.4],
-    [262, 0.4],
-    [349, 0.4],
-    [330, 0.6],
-    [262, 0.3],
-    [262, 0.15],
-    [294, 0.4],
-    [262, 0.4],
-    [392, 0.4],
-    [349, 0.6],
-    [262, 0.3],
-    [262, 0.15],
-    [523, 0.4],
-    [440, 0.4],
-    [349, 0.4],
-    [330, 0.4],
-    [294, 0.6],
-    [466, 0.3],
-    [466, 0.15],
-    [440, 0.4],
-    [349, 0.4],
-    [392, 0.4],
-    [349, 0.6],
-  ];
+  const playTune = useCallback(
+    (melody: Melody) => {
+      if (playing) return;
+      setPlaying(true);
+      setNoteHistory([]);
+      setSelectedMelody(melody);
 
-  const playTune = useCallback(() => {
-    if (playing) return;
-    setPlaying(true);
-    setNoteHistory([]);
+      const wave = PROFILE_WAVEFORM[profile];
+      let time = 0;
+      const startTime = Date.now();
+      const ids: number[] = [];
 
-    const wave = PROFILE_WAVEFORM[profile];
-    let time = 0;
-    const startTime = Date.now();
+      melody.notes.forEach(([f, dur], i) => {
+        const id = window.setTimeout(() => {
+          audioEngine.playTone({
+            frequency: f,
+            type: wave,
+            duration: dur * 0.9,
+            volume: 0.15,
+            rampMultiplier: 0.85,
+          });
+          setActiveNote({ freq: f, dur, index: i, wave });
+          setNoteHistory((prev) => [
+            ...prev,
+            { freq: f, dur, time: Date.now() - startTime, wave },
+          ]);
+        }, time * 1000);
+        ids.push(id);
+        time += dur + 0.05;
+      });
 
-    MELODY.forEach(([f, dur], i) => {
-      setTimeout(() => {
-        audioEngine.playTone({
-          frequency: f,
-          type: wave,
-          duration: dur * 0.9,
-          volume: 0.15,
-          rampMultiplier: 0.85,
-        });
-        setActiveNote({ freq: f, dur, index: i, wave });
-        setNoteHistory((prev) => [
-          ...prev,
-          { freq: f, dur, time: Date.now() - startTime, wave },
-        ]);
+      const endId = window.setTimeout(() => {
+        setPlaying(false);
+        setActiveNote(null);
       }, time * 1000);
-      time += dur + 0.05;
-    });
+      ids.push(endId);
+      timeoutsRef.current = ids;
+    },
+    [playing, profile],
+  );
 
-    setTimeout(() => {
-      setPlaying(false);
-      setActiveNote(null);
-    }, time * 1000);
-  }, [playing, profile]);
+  useEffect(() => {
+    return () => timeoutsRef.current.forEach(clearTimeout);
+  }, []);
 
   return (
     <div className="dark min-h-screen w-full bg-[#000000] relative text-white">
@@ -368,21 +362,54 @@ export default function AudioPlayground() {
             <Separator className="bg-zinc-800" />
 
             <div>
-              <SliderLabel>Demo Melody</SliderLabel>
-              <Button
-                variant={playing ? "secondary" : "outline"}
-                className="w-full gap-2"
-                disabled={playing}
-                onClick={playTune}
-              >
-                <Music className="size-4" />
-                {playing ? "Playing..." : "Play Birthday Tune"}
-              </Button>
-              <p className="text-[0.6rem] text-zinc-600 mt-2">
-                Switch profiles above to hear the same tune in different styles
+              <SliderLabel>Demo Melodies</SliderLabel>
+
+              {/* Category tabs */}
+              <div className="flex gap-1.5 mb-3">
+                {MELODY_CATEGORIES.map((cat) => (
+                  <Button
+                    key={cat}
+                    size="sm"
+                    variant={melodyCategory === cat ? "default" : "outline"}
+                    onClick={() => setMelodyCategory(cat)}
+                    className="text-[0.7rem]"
+                  >
+                    {cat}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Melody buttons */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {MELODIES.filter((m) => m.category === melodyCategory).map(
+                  (m) => (
+                    <Button
+                      key={m.id}
+                      size="sm"
+                      variant={
+                        selectedMelody.id === m.id && playing
+                          ? "secondary"
+                          : "outline"
+                      }
+                      disabled={playing}
+                      className="gap-1.5"
+                      onClick={() => playTune(m)}
+                    >
+                      <Music className="size-3" />
+                      {m.name}
+                    </Button>
+                  ),
+                )}
+              </div>
+
+              <p className="text-[0.6rem] text-zinc-600 mb-1">
+                {playing
+                  ? `Playing: ${selectedMelody.name}`
+                  : "Switch profiles above to hear tunes in different styles"}
               </p>
+
               <MelodyVisualizer
-                melody={MELODY}
+                melody={selectedMelody.notes}
                 activeNote={activeNote}
                 noteHistory={noteHistory}
                 playing={playing}
