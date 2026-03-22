@@ -177,11 +177,22 @@ export default function AudioPlayground() {
     industrial: "sawtooth",
   };
 
+  const stopTune = useCallback(() => {
+    timeoutsRef.current.forEach(clearTimeout);
+    timeoutsRef.current = [];
+    setPlaying(false);
+    setActiveNote(null);
+  }, []);
+
   const playTune = useCallback(
     (melody: Melody) => {
-      if (playing) return;
+      // Stop current tune if playing
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
+
       setPlaying(true);
       setNoteHistory([]);
+      setActiveNote(null);
       setSelectedMelody(melody);
 
       const wave = PROFILE_WAVEFORM[profile];
@@ -215,7 +226,7 @@ export default function AudioPlayground() {
       ids.push(endId);
       timeoutsRef.current = ids;
     },
-    [playing, profile],
+    [profile],
   );
 
   useEffect(() => {
@@ -365,47 +376,53 @@ export default function AudioPlayground() {
               <SliderLabel>Demo Melodies</SliderLabel>
 
               {/* Category tabs */}
-              <div className="flex gap-1.5 mb-3">
+              <div className="flex border-b border-zinc-800 mb-4">
                 {MELODY_CATEGORIES.map((cat) => (
-                  <Button
+                  <button
                     key={cat}
-                    size="sm"
-                    variant={melodyCategory === cat ? "default" : "outline"}
+                    type="button"
                     onClick={() => setMelodyCategory(cat)}
-                    className="text-[0.7rem]"
+                    className={`px-3 py-2 text-[0.7rem] font-medium transition-all border-b-2 -mb-px ${
+                      melodyCategory === cat
+                        ? "border-green-500 text-white"
+                        : "border-transparent text-zinc-500 hover:text-zinc-300"
+                    }`}
                   >
                     {cat}
-                  </Button>
+                  </button>
                 ))}
               </div>
 
               {/* Melody buttons */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
+              <div className="grid grid-cols-2 gap-2 mb-3">
                 {MELODIES.filter((m) => m.category === melodyCategory).map(
-                  (m) => (
-                    <Button
-                      key={m.id}
-                      size="sm"
-                      variant={
-                        selectedMelody.id === m.id && playing
-                          ? "secondary"
-                          : "outline"
-                      }
-                      disabled={playing}
-                      className="gap-1.5"
-                      onClick={() => playTune(m)}
-                    >
-                      <Music className="size-3" />
-                      {m.name}
-                    </Button>
-                  ),
+                  (m) => {
+                    const isActive = selectedMelody.id === m.id && playing;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => (isActive ? stopTune() : playTune(m))}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-all ${
+                          isActive
+                            ? "bg-green-500/10 border border-green-500/30 text-green-400"
+                            : "border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-white"
+                        }`}
+                      >
+                        <Music
+                          className={`size-3.5 shrink-0 ${isActive ? "text-green-400" : "text-zinc-600"}`}
+                        />
+                        <span className="truncate">{m.name}</span>
+                      </button>
+                    );
+                  },
                 )}
               </div>
 
               <p className="text-[0.6rem] text-zinc-600 mb-1">
                 {playing
                   ? `Playing: ${selectedMelody.name}`
-                  : "Switch profiles above to hear tunes in different styles"}
+                  : "Switch profiles to hear tunes in different styles"}
               </p>
 
               <MelodyVisualizer
