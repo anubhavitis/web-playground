@@ -16,6 +16,14 @@ import {
   Joystick,
   Factory,
   Music,
+  Drum,
+  Zap,
+  CircleDollarSign,
+  CircleDot,
+  Siren,
+  AudioWaveform,
+  Bird,
+  WavesLadder,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -49,23 +57,64 @@ const OSCILLATOR_TYPES: OscillatorShape[] = [
   "triangle",
 ];
 
-const PRESETS = [
-  { label: "Bass Hit", f: 80, t: "sine" as const, d: 0.3, v: 0.2, r: 0.1 },
+const PRESETS: {
+  label: string;
+  icon: LucideIcon;
+  f: number;
+  t: OscillatorShape;
+  d: number;
+  v: number;
+  r: number;
+}[] = [
+  { label: "Bass Hit", icon: Drum, f: 80, t: "sine", d: 0.3, v: 0.2, r: 0.1 },
   {
     label: "Laser",
+    icon: Zap,
     f: 3000,
-    t: "sawtooth" as const,
+    t: "sawtooth",
     d: 0.15,
     v: 0.08,
     r: 0.05,
   },
-  { label: "Coin", f: 1400, t: "square" as const, d: 0.08, v: 0.06, r: 1.5 },
-  { label: "Blip", f: 800, t: "sine" as const, d: 0.03, v: 0.1, r: 0.8 },
-  { label: "Alarm", f: 1000, t: "square" as const, d: 0.5, v: 0.05, r: 2 },
-  { label: "Deep Hum", f: 55, t: "triangle" as const, d: 1, v: 0.15, r: 0.9 },
-  { label: "Chirp", f: 2000, t: "sine" as const, d: 0.05, v: 0.08, r: 0.1 },
-  { label: "Buzz", f: 150, t: "sawtooth" as const, d: 0.2, v: 0.04, r: 1 },
-] as const;
+  {
+    label: "Coin",
+    icon: CircleDollarSign,
+    f: 1400,
+    t: "square",
+    d: 0.08,
+    v: 0.06,
+    r: 1.5,
+  },
+  {
+    label: "Blip",
+    icon: CircleDot,
+    f: 800,
+    t: "sine",
+    d: 0.03,
+    v: 0.1,
+    r: 0.8,
+  },
+  { label: "Alarm", icon: Siren, f: 1000, t: "square", d: 0.5, v: 0.05, r: 2 },
+  {
+    label: "Deep Hum",
+    icon: AudioWaveform,
+    f: 55,
+    t: "triangle",
+    d: 1,
+    v: 0.15,
+    r: 0.9,
+  },
+  { label: "Chirp", icon: Bird, f: 2000, t: "sine", d: 0.05, v: 0.08, r: 0.1 },
+  {
+    label: "Buzz",
+    icon: WavesLadder,
+    f: 150,
+    t: "sawtooth",
+    d: 0.2,
+    v: 0.04,
+    r: 1,
+  },
+];
 
 export default function AudioPlayground() {
   const [unlocked, setUnlocked] = useState(false);
@@ -248,76 +297,77 @@ export default function AudioPlayground() {
         }}
       />
 
-      {/* Hero */}
-      <section className="relative z-10 lg:grid lg:grid-cols-2 lg:min-h-screen">
-        {/* Left: text */}
-        <div className="flex flex-col justify-center px-6 py-12 lg:px-16 lg:py-0">
+      {/* Hero header — full width */}
+      <section className="relative z-10 px-6 lg:px-16 pt-12 lg:pt-16 pb-8">
+        <div className="max-w-5xl mx-auto">
           <Link
             to="/"
-            className="text-zinc-500 text-xs hover:text-white transition-colors mb-6 w-fit"
+            className="text-zinc-500 text-xs hover:text-white transition-colors mb-6 inline-block"
           >
             &larr; Home
           </Link>
 
-          <h1 className="text-3xl lg:text-5xl font-bold tracking-tight leading-tight mb-4">
-            Audio Playground
-          </h1>
-
-          <p className="text-zinc-400 leading-relaxed mb-4 max-w-md">
-            <strong className="text-white">
-              No audio files. Zero downloads.
-            </strong>{" "}
-            Every sound is generated in real-time using the{" "}
-            <a
-              href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold underline underline-offset-2 text-white hover:text-zinc-400 transition-colors"
-            >
-              Web Audio API
-            </a>
-            . The browser creates raw oscillator waveforms, shapes them with
-            gain nodes, and applies frequency ramps — all in under a
-            millisecond.
-          </p>
-
-          <p className="text-zinc-400 leading-relaxed mb-8 max-w-md">
-            A single function replaces hundreds of .mp3 files. Each sound
-            profile is just a different parameter set fed to the same oscillator
-            — personality in UI sound is math, not media.
-          </p>
-
-          <div className="flex items-center gap-3">
-            {!unlocked ? (
-              <Button
-                variant="destructive"
-                onClick={handleUnlock}
-                className="animate-pulse gap-1.5"
-              >
-                <Volume2 className="size-4" />
-                Enable Audio
-              </Button>
-            ) : (
-              <Badge
-                variant={muted ? "destructive" : "secondary"}
-                className="cursor-pointer select-none"
-                onClick={() => setMuted((m) => !m)}
-              >
-                {muted ? "Muted" : "Sound On"}
-              </Badge>
-            )}
-          </div>
-
-          {unlocked && (
-            <div className="mt-6">
-              <ContextInfo />
+          <div className="mb-8 flex-col gap-4">
+            <div className="mb-4">
+              <h1 className="text-3xl lg:text-5xl font-bold tracking-tight leading-tight mb-4">
+                sound is math, not media
+              </h1>
+              <p className="text-zinc-400 leading-relaxed mb-4">
+                <strong className="text-white">
+                  No audio files. Zero downloads.
+                </strong>{" "}
+                Every sound is generated in real-time using the{" "}
+                <a
+                  href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold underline underline-offset-2 text-white hover:text-zinc-400 transition-colors"
+                >
+                  Web Audio API
+                </a>
+                . The browser creates raw oscillator waveforms, shapes them with
+                gain nodes, and applies frequency ramps — all in under a
+                millisecond.
+              </p>
+              <p className="text-zinc-400 leading-relaxed">
+                A single function replaces hundreds of .mp3 files. Each sound
+                profile is just a different parameter set fed to the same
+                oscillator — personality in UI sound is math, not media.
+              </p>
             </div>
-          )}
-        </div>
 
-        {/* Right: profile sounds */}
-        <div className="flex flex-col justify-center px-6 py-8 lg:px-12 lg:py-0">
-          <div className="max-w-md mx-auto w-full space-y-6">
+            <div className="lg:mt-0 shrink-0 my-auto">
+              <div className="flex items-center gap-3 mb-4">
+                {!unlocked ? (
+                  <Button
+                    variant="destructive"
+                    onClick={handleUnlock}
+                    className="animate-pulse gap-1.5"
+                  >
+                    <Volume2 className="size-4" />
+                    Enable Audio
+                  </Button>
+                ) : (
+                  <Badge
+                    variant={muted ? "destructive" : "secondary"}
+                    className="cursor-pointer select-none"
+                    onClick={() => setMuted((m) => !m)}
+                  >
+                    {muted ? "Muted" : "Sound On"}
+                  </Badge>
+                )}
+              </div>
+              {unlocked && <ContextInfo />}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Interactive controls — 2 cols on desktop */}
+      <section className="relative z-10 px-6 lg:px-16 py-8 lg:py-12">
+        <div className="max-w-5xl mx-auto lg:grid lg:grid-cols-2 lg:gap-8">
+          {/* Left: profiles + try it */}
+          <div className="space-y-6 mb-8 lg:mb-0">
             <div>
               <SliderLabel>Sound Profile</SliderLabel>
               <div className="flex flex-wrap gap-2">
@@ -369,164 +419,171 @@ export default function AudioPlayground() {
                 />
               </div>
             </div>
-
-            <Separator className="bg-zinc-800" />
-
-            <div>
-              <SliderLabel>Demo Melodies</SliderLabel>
-
-              {/* Category tabs */}
-              <div className="flex border-b border-zinc-800 mb-4">
-                {MELODY_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setMelodyCategory(cat)}
-                    className={`px-3 py-2 text-[0.7rem] font-medium transition-all border-b-2 -mb-px ${
-                      melodyCategory === cat
-                        ? "border-green-500 text-white"
-                        : "border-transparent text-zinc-500 hover:text-zinc-300"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Melody buttons */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                {MELODIES.filter((m) => m.category === melodyCategory).map(
-                  (m) => {
-                    const isActive = selectedMelody.id === m.id && playing;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => (isActive ? stopTune() : playTune(m))}
-                        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-all ${
-                          isActive
-                            ? "bg-green-500/10 border border-green-500/30 text-green-400"
-                            : "border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-white"
-                        }`}
-                      >
-                        <Music
-                          className={`size-3.5 shrink-0 ${isActive ? "text-green-400" : "text-zinc-600"}`}
-                        />
-                        <span className="truncate">{m.name}</span>
-                      </button>
-                    );
-                  },
-                )}
-              </div>
-
-              <p className="text-[0.6rem] text-zinc-600 mb-1">
-                {playing
-                  ? `Playing: ${selectedMelody.name}`
-                  : "Switch profiles to hear tunes in different styles"}
-              </p>
-
-              <MelodyVisualizer
-                melody={selectedMelody.notes}
-                activeNote={activeNote}
-                noteHistory={noteHistory}
-                playing={playing}
-                wave={PROFILE_WAVEFORM[profile]}
-              />
-            </div>
           </div>
+
+          {/* Right: melodies */}
+          <div>
+            <SliderLabel>Demo Melodies</SliderLabel>
+
+            <div className="flex border-b border-zinc-800 mb-4">
+              {MELODY_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setMelodyCategory(cat)}
+                  className={`px-3 py-2 text-[0.7rem] font-medium transition-all border-b-2 -mb-px ${
+                    melodyCategory === cat
+                      ? "border-green-500 text-white"
+                      : "border-transparent text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              {MELODIES.filter((m) => m.category === melodyCategory).map(
+                (m) => {
+                  const isActive = selectedMelody.id === m.id && playing;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => (isActive ? stopTune() : playTune(m))}
+                      className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-sm transition-all ${
+                        isActive
+                          ? "bg-green-500/10 border border-green-500/30 text-green-400"
+                          : "border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-white"
+                      }`}
+                    >
+                      <Music
+                        className={`size-3.5 shrink-0 ${isActive ? "text-green-400" : "text-zinc-600"}`}
+                      />
+                      <span className="truncate">{m.name}</span>
+                    </button>
+                  );
+                },
+              )}
+            </div>
+
+            <p className="text-[0.6rem] text-zinc-600 mb-1">
+              {playing
+                ? `Playing: ${selectedMelody.name}`
+                : "Switch profiles to hear tunes in different styles"}
+            </p>
+          </div>
+        </div>
+
+        {/* Visualizer — full width */}
+        <div className="max-w-5xl mx-auto mt-6">
+          <MelodyVisualizer
+            melody={selectedMelody.notes}
+            activeNote={activeNote}
+            noteHistory={noteHistory}
+            playing={playing}
+            wave={PROFILE_WAVEFORM[profile]}
+          />
         </div>
       </section>
 
-      {/* Controls */}
-      <section
-        data-no-sound
-        className="relative z-10 max-w-3xl mx-auto px-6 py-12"
-      >
-        <Card className="bg-zinc-950/80 border-zinc-800 text-white">
-          <CardHeader>
-            <CardTitle>Free Play</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div>
-              <SliderLabel>Waveform</SliderLabel>
-              <div className="flex gap-1.5">
-                {OSCILLATOR_TYPES.map((t) => (
-                  <Button
-                    key={t}
-                    size="sm"
-                    variant={oscType === t ? "default" : "outline"}
-                    onClick={() => setOscType(t)}
-                  >
-                    {t}
+      {/* Free Play */}
+      <section data-no-sound className="relative z-10 px-6 lg:px-16 py-12">
+        <div className="max-w-5xl mx-auto">
+          <Card className="bg-zinc-950/80 border-zinc-800 text-white">
+            <CardHeader>
+              <CardTitle>Free Play</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col lg:flex-row lg:gap-10">
+                {/* Left: controls */}
+                <div className="space-y-5 lg:w-2/5 shrink-0">
+                  <div>
+                    <SliderLabel>Waveform</SliderLabel>
+                    <div className="flex gap-1.5">
+                      {OSCILLATOR_TYPES.map((t) => (
+                        <Button
+                          key={t}
+                          size="sm"
+                          variant={oscType === t ? "default" : "outline"}
+                          onClick={() => setOscType(t)}
+                        >
+                          {t}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <Separator className="bg-zinc-800" />
+
+                  <SliderRow
+                    label="Frequency"
+                    value={freq}
+                    display={`${freq} Hz`}
+                    min={20}
+                    max={8000}
+                    step={1}
+                    onChange={setFreq}
+                    hint="20 Hz — 8000 Hz"
+                  />
+                  <SliderRow
+                    label="Duration"
+                    value={duration}
+                    display={`${duration.toFixed(2)}s`}
+                    min={0.01}
+                    max={2}
+                    step={0.01}
+                    onChange={setDuration}
+                  />
+                  <SliderRow
+                    label="Volume"
+                    value={volume}
+                    display={`${(volume * 100).toFixed(0)}%`}
+                    min={0}
+                    max={0.5}
+                    step={0.01}
+                    onChange={setVolume}
+                  />
+                  <SliderRow
+                    label="Freq Ramp"
+                    value={ramp}
+                    display={`${ramp.toFixed(2)}x`}
+                    min={0.05}
+                    max={2}
+                    step={0.01}
+                    onChange={setRamp}
+                    hint="<1 pitch drops · >1 pitch rises"
+                  />
+
+                  <Button className="w-full" size="lg" onClick={playFree}>
+                    Play Tone
                   </Button>
-                ))}
+                </div>
+
+                {/* Right: presets */}
+                <div className="mt-6 lg:mt-0 flex-1">
+                  <SliderLabel>Quick Presets</SliderLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESETS.map((p) => {
+                      const Icon = p.icon;
+                      return (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() => applyPreset(p)}
+                          className="flex-1 basis-[calc(25%-0.5rem)] min-w-[calc(25%-0.5rem)] flex flex-col items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/60 py-4 text-sm text-zinc-300 hover:border-zinc-600 hover:text-white transition-all active:scale-95 cursor-pointer"
+                        >
+                          <Icon className="size-5 text-zinc-500" />
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <Separator className="bg-zinc-800" />
-
-            <SliderRow
-              label="Frequency"
-              value={freq}
-              display={`${freq} Hz`}
-              min={20}
-              max={8000}
-              step={1}
-              onChange={setFreq}
-              hint="20 Hz — 8000 Hz"
-            />
-            <SliderRow
-              label="Duration"
-              value={duration}
-              display={`${duration.toFixed(2)}s`}
-              min={0.01}
-              max={2}
-              step={0.01}
-              onChange={setDuration}
-            />
-            <SliderRow
-              label="Volume"
-              value={volume}
-              display={`${(volume * 100).toFixed(0)}%`}
-              min={0}
-              max={0.5}
-              step={0.01}
-              onChange={setVolume}
-            />
-            <SliderRow
-              label="Freq Ramp"
-              value={ramp}
-              display={`${ramp.toFixed(2)}x`}
-              min={0.05}
-              max={2}
-              step={0.01}
-              onChange={setRamp}
-              hint="<1 pitch drops · >1 pitch rises"
-            />
-
-            <Button className="w-full" size="lg" onClick={playFree}>
-              Play Tone
-            </Button>
-
-            <Separator className="bg-zinc-800" />
-
-            <div>
-              <SliderLabel>Quick Presets</SliderLabel>
-              <div className="flex flex-wrap gap-1.5">
-                {PRESETS.map((p) => (
-                  <Button
-                    key={p.label}
-                    size="sm"
-                    variant="outline"
-                    onClick={() => applyPreset(p)}
-                  >
-                    {p.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </section>
     </div>
   );
@@ -614,7 +671,7 @@ function ContextInfo() {
   ] as const;
 
   return (
-    <div className="text-xs text-zinc-500 leading-7">
+    <div className="text-xs text-zinc-500 leading-7 flex gap-4 justify-between">
       {items.map(([key, val]) => (
         <div key={key}>
           <strong className="text-zinc-300">{key}:</strong> {val}
