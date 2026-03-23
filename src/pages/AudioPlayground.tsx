@@ -234,7 +234,7 @@ export default function AudioPlayground() {
   }, []);
 
   const playTune = useCallback(
-    (melody: Melody) => {
+    (melody: Melody, profileOverride?: SoundProfile) => {
       // Stop current tune if playing
       timeoutsRef.current.forEach(clearTimeout);
       timeoutsRef.current = [];
@@ -244,7 +244,7 @@ export default function AudioPlayground() {
       setActiveNote(null);
       setSelectedMelody(melody);
 
-      const wave = PROFILE_WAVEFORM[profile];
+      const wave = PROFILE_WAVEFORM[profileOverride ?? profile];
       let time = 0;
       const startTime = Date.now();
       const ids: number[] = [];
@@ -314,18 +314,18 @@ export default function AudioPlayground() {
                   href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-semibold underline underline-offset-2 text-white hover:text-zinc-400 transition-colors"
+                  className="underline underline-offset-2 text-white hover:text-zinc-400 transition-colors"
                 >
                   Web Audio API
                 </a>
                 . The browser creates raw oscillator waveforms, shapes them with
-                gain nodes, and applies frequency ramps — all in under a
-                millisecond.
+                gain nodes, and applies frequency ramps. All in less than the
+                human brain can notice.
               </p>
               <p className="text-zinc-400 leading-relaxed">
                 A single function replaces hundreds of .mp3 files. Each sound
                 profile is just a different parameter set fed to the same
-                oscillator — personality in UI sound is math, not media.
+                oscillator. Personality in UI sound is math, not media.
               </p>
             </div>
 
@@ -374,7 +374,10 @@ export default function AudioPlayground() {
                       className="gap-1.5 capitalize"
                       onClick={() => {
                         setProfile(p);
-                        audioEngine.playClick();
+                        audioEngine.setProfile(p);
+                        if (playing) {
+                          playTune(selectedMelody, p);
+                        }
                       }}
                     >
                       <Icon className="size-3.5" />
