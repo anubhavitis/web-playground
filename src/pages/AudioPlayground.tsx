@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+// import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -300,13 +300,6 @@ export default function AudioPlayground() {
       {/* Hero header — full width */}
       <section className="relative z-10 px-6 lg:px-16 pt-12 lg:pt-16 pb-8">
         <div className="max-w-5xl mx-auto">
-          <Link
-            to="/"
-            className="text-zinc-500 text-xs hover:text-white transition-colors mb-6 inline-block"
-          >
-            &larr; Home
-          </Link>
-
           <div className="mb-8 flex-col gap-4">
             <div className="mb-4">
               <h1 className="text-3xl lg:text-5xl font-bold tracking-tight leading-tight mb-4">
