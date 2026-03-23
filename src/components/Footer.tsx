@@ -6,7 +6,7 @@ export default function Footer() {
     <footer className="relative bg-black/80 backdrop-blur-md px-6 py-6 mt-12">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent" />
 
-      <div className="mx-auto flex max-w-5xl items-center justify-between">
+      <div className="mx-auto flex max-w-5xl flex-col items-center gap-3 sm:flex-row sm:justify-between">
         <span className="text-xs text-zinc-500 tracking-wide">
           built with ❤️ for maths and machines
         </span>
